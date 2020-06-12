@@ -9,7 +9,21 @@ fn main() {
     let mut traits_output = File::create(out_path.join("core_traits.rs")).unwrap();
     let mut methods_output = File::create(out_path.join("core_methods.rs")).unwrap();
 
-    let classes = strongly_connected_components(&Api::new(), "Object", None);
+    let api = Api::new();
+
+    let classes = strongly_connected_components(&api, "Object", None);
+
+    generate_method_table(
+        &mut methods_output,
+        "CORE_METHOD_TABLE",
+        &api,
+        api.classes
+            .iter()
+            .filter(|class| classes.contains(&class.name))
+            .collect::<Vec<&GodotClass>>()
+            .as_slice(),
+    )
+    .unwrap();
 
     for class in classes {
         generate_class(

@@ -17,6 +17,7 @@ fn main() {
         &mut types_output,
         &mut traits_output,
         &mut methods_output,
+        "BINDINGS_METHOD_TABLE",
         Some(to_ignore),
     )
     .unwrap();

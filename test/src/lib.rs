@@ -2,8 +2,6 @@
 
 use gdnative::*;
 
-use gdnative::private::get_api;
-
 mod test_derive;
 mod test_free_ub;
 mod test_register;
@@ -88,9 +86,9 @@ fn test_constructor() -> bool {
 fn test_underscore_method_binding() -> bool {
     println!(" -- test_underscore_method_binding");
 
-    let ok = std::panic::catch_unwind(|| {
-        let table = gdnative::NativeScriptMethodTable::get(get_api());
-        assert_ne!(0, table._new as usize);
+    let ok = std::panic::catch_unwind(|| unsafe {
+        let table = gdnative::BINDINGS_METHOD_TABLE.as_ref().unwrap();
+        assert_ne!(0, table.NativeScript___new as usize);
     })
     .is_ok();
 

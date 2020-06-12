@@ -4,7 +4,12 @@ use std::io::Write;
 
 use heck::SnakeCase;
 
-pub fn generate_reference_ctor(output: &mut impl Write, class: &GodotClass) -> GeneratorResult {
+pub fn generate_reference_ctor(
+    output: &mut impl Write,
+    table_name: &str,
+    namespace: &str,
+    class: &GodotClass,
+) -> GeneratorResult {
     writeln!(
         output,
         r#"
@@ -12,8 +17,7 @@ pub fn generate_reference_ctor(output: &mut impl Write, class: &GodotClass) -> G
     #[inline]
     pub fn new() -> Self {{
         unsafe {{
-            let gd_api = get_api();
-            let ctor = {name}MethodTable::get(gd_api).class_constructor.unwrap();
+            let ctor = crate::{namespace}{table_name}.as_ref().unwrap().{name}__class_constructor.unwrap();
             let obj = ctor();
             object::init_ref_count(obj);
 
@@ -23,6 +27,8 @@ pub fn generate_reference_ctor(output: &mut impl Write, class: &GodotClass) -> G
         }}
     }}
 "#,
+        table_name = table_name,
+        namespace = namespace,
         name = class.name
     )?;
 
@@ -50,7 +56,12 @@ pub fn generate_reference_copy(output: &mut impl Write, _class: &GodotClass) -> 
     Ok(())
 }
 
-pub fn generate_non_reference_ctor(output: &mut impl Write, class: &GodotClass) -> GeneratorResult {
+pub fn generate_non_reference_ctor(
+    output: &mut impl Write,
+    table_name: &str,
+    namespace: &str,
+    class: &GodotClass,
+) -> GeneratorResult {
     writeln!(
         output,
         r#"
@@ -64,8 +75,7 @@ pub fn generate_non_reference_ctor(output: &mut impl Write, class: &GodotClass) 
     #[inline]
     pub fn new() -> Self {{
         unsafe {{
-            let gd_api = get_api();
-            let ctor = {name}MethodTable::get(gd_api).class_constructor.unwrap();
+            let ctor = crate::{namespace}{table_name}.as_ref().unwrap().{name}__class_constructor.unwrap();
             let this = ctor();
 
             {name} {{
@@ -79,6 +89,8 @@ pub fn generate_non_reference_ctor(output: &mut impl Write, class: &GodotClass) 
     pub unsafe fn free(self) {{
         (get_api().godot_object_destroy)(self.this);
     }}"#,
+        table_name = table_name,
+        namespace = namespace,
         name = class.name
     )?;
 
@@ -217,7 +229,7 @@ pub fn generate_dynamic_cast(output: &mut impl Write, class: &GodotClass) -> Gen
     /// Generic dynamic cast.
     #[inline]
     pub {maybe_unsafe}fn cast<T: GodotObject>(&self) -> Option<T> {{
-    unsafe {{
+        unsafe {{
             object::godot_cast::<T>(self.this)
         }}
     }}"#,
@@ -251,7 +263,7 @@ pub fn generate_upcast(
                 name = parent.name,
                 snake_name = snake_name,
                 addref_if_reference = if parent.is_refcounted() {
-                    "unsafe {{ object::add_ref(self.this); }}"
+                    "unsafe { object::add_ref(self.this); }"
                 } else {
                     "// Not reference-counted."
                 },

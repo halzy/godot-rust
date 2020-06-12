@@ -1,5 +1,4 @@
 use crate::sys;
-use crate::ObjectMethodTable;
 use std::ptr;
 
 /// Trait for Godot API objects. This trait is sealed, and implemented for generated wrapper
@@ -63,9 +62,11 @@ pub trait QueueFree {
 // This function assumes the godot_object is reference counted.
 #[inline]
 pub unsafe fn add_ref(obj: *mut sys::godot_object) {
-    use crate::ReferenceMethodTable;
     let api = crate::private::get_api();
-    let addref_method = ReferenceMethodTable::unchecked_get().reference;
+    let addref_method = crate::generated::CORE_METHOD_TABLE
+        .as_ref()
+        .unwrap()
+        .Reference__reference;
     let mut argument_buffer = [ptr::null() as *const libc::c_void; 0];
     let mut ok = false;
     let ok_ptr = &mut ok as *mut bool;
@@ -85,8 +86,10 @@ pub unsafe fn add_ref(obj: *mut sys::godot_object) {
 // This function assumes the godot_object is reference counted.
 #[inline]
 pub unsafe fn unref(obj: *mut sys::godot_object) -> bool {
-    use crate::ReferenceMethodTable;
-    let unref_method = ReferenceMethodTable::unchecked_get().unreference;
+    let unref_method = crate::generated::CORE_METHOD_TABLE
+        .as_ref()
+        .unwrap()
+        .Reference__unreference;
     let mut argument_buffer = [ptr::null() as *const libc::c_void; 0];
     let mut last_reference = false;
     let ret_ptr = &mut last_reference as *mut bool;
@@ -103,8 +106,10 @@ pub unsafe fn unref(obj: *mut sys::godot_object) -> bool {
 // This function assumes the godot_object is reference counted.
 #[inline]
 pub unsafe fn init_ref_count(obj: *mut sys::godot_object) {
-    use crate::ReferenceMethodTable;
-    let init_method = ReferenceMethodTable::unchecked_get().init_ref;
+    let init_method = crate::generated::CORE_METHOD_TABLE
+        .as_ref()
+        .unwrap()
+        .Reference__init_ref;
     let mut argument_buffer = [ptr::null() as *const libc::c_void; 0];
     let mut ok = false;
     let ret_ptr = &mut ok as *mut bool;
@@ -121,7 +126,10 @@ pub unsafe fn init_ref_count(obj: *mut sys::godot_object) {
 #[inline]
 pub unsafe fn is_class(obj: *mut sys::godot_object, class_name: &str) -> bool {
     let api = crate::private::get_api();
-    let method_bind = ObjectMethodTable::get(api).is_class;
+    let method_bind = crate::generated::CORE_METHOD_TABLE
+        .as_ref()
+        .unwrap()
+        .Object__is_class;
 
     let mut class_name = (api.godot_string_chars_to_utf8_with_len)(
         class_name.as_ptr() as *const _,

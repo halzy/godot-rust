@@ -26,15 +26,23 @@ pub fn generate_bindings(
     output_types_impls: &mut impl Write,
     output_trait_impls: &mut impl Write,
     output_method_table: &mut impl Write,
+    table_name: &str,
     ignore: Option<HashSet<String>>,
 ) -> GeneratorResult {
     let to_ignore = ignore.unwrap_or_default();
 
     let api = Api::new();
+    let classes: Vec<&GodotClass> = api
+        .classes
+        .iter()
+        .filter(|class| !to_ignore.contains(&class.name))
+        .collect();
 
     generate_imports(output_types_impls)?;
 
-    for class in &api.classes {
+    generate_method_table(output_method_table, table_name, &api, classes.as_slice())?;
+
+    for class in &classes {
         // ignore classes that have been generated before.
         if to_ignore.contains(&class.name) {
             continue;
@@ -44,6 +52,8 @@ pub fn generate_bindings(
             output_types_impls,
             output_trait_impls,
             output_method_table,
+            "BINDINGS_METHOD_TABLE",
+            "",
             &api,
             class,
         )?;
@@ -75,6 +85,8 @@ pub fn generate_class(
             output_types_impls,
             output_trait_impls,
             output_method_table,
+            "CORE_METHOD_TABLE",
+            "generated::",
             &api,
             class,
         )?;
@@ -83,10 +95,155 @@ pub fn generate_class(
     Ok(())
 }
 
+pub fn generate_method_table(
+    output: &mut impl Write,
+    table_name: &str,
+    api: &Api,
+    classes: &[&GodotClass],
+) -> GeneratorResult {
+    use heck::ShoutySnakeCase;
+    let camel_table_name = table_name.to_shouty_snake_case();
+
+    writeln!(
+        output,
+        r#"
+#[doc(hidden)]
+pub static mut {table_name}: Option<{camel_table_name}> = None;
+
+#[doc(hidden)]
+#[allow(non_camel_case_types)]
+pub struct {camel_table_name} {{"#,
+        table_name = table_name,
+        camel_table_name = camel_table_name,
+    )?;
+
+    for class in classes {
+        writeln!(
+            output,
+            r#"
+    pub {class_name}__class_constructor: sys::godot_class_constructor,"#,
+            class_name = class.name
+        )?;
+        for method in &class.methods {
+            let MethodName {
+                rust_name: method_name,
+                ..
+            } = method.get_name();
+            if method_name == "free" {
+                continue;
+            }
+            writeln!(
+                output,
+                "    pub {}__{}: *mut sys::godot_method_bind,",
+                class.name, method_name
+            )?;
+        }
+    }
+
+    writeln!(
+        output,
+        r#"
+}}
+
+#[doc(hidden)]
+impl {camel_table_name} {{
+    pub fn new() -> Self {{
+        Self {{"#,
+        camel_table_name = camel_table_name
+    )?;
+
+    for class in classes {
+        writeln!(
+            output,
+            r#"
+            {class_name}__class_constructor: None,"#,
+            class_name = class.name
+        )?;
+        for method in &class.methods {
+            let MethodName {
+                rust_name: method_name,
+                ..
+            } = method.get_name();
+            if method_name == "free" {
+                continue;
+            }
+            writeln!(
+                output,
+                "            {}__{}: 0 as *mut sys::godot_method_bind,",
+                class.name, method_name
+            )?;
+        }
+    }
+
+    writeln!(
+        output,
+        r#"
+        }}
+    }}
+}}
+
+pub fn bind_method_table(gd_api: &GodotApi) {{
+    static INIT: Once = Once::new();
+    INIT.call_once(|| unsafe {{
+        let get_constructor = gd_api.godot_get_class_constructor;
+        let get_method = gd_api.godot_method_bind_get_method;
+        let mut table = {camel_table_name}::new();"#,
+        camel_table_name = camel_table_name
+    )?;
+
+    for class in classes {
+        let has_underscore = api.api_underscore.contains(&class.name);
+        let class_lookup_name: String = if has_underscore {
+            format!("_{class}", class = class.name)
+        } else {
+            class.name.clone()
+        };
+        writeln!(
+            output,
+            r#"
+        // Bindings for {class_name}
+        let class_name = b"{class_lookup_name}\0".as_ptr() as *const c_char;
+        table.{class_name}__class_constructor = (get_constructor)(class_name);"#,
+            class_name = class.name,
+            class_lookup_name = class_lookup_name
+        )?;
+
+        for method in &class.methods {
+            let MethodName {
+                rust_name: method_name,
+                original_name,
+            } = method.get_name();
+            if method_name == "free" {
+                continue;
+            }
+
+            writeln!(
+                output,
+                r#"        table.{class_name}__{method_name} = (get_method)(class_name, "{original_name}\0".as_ptr() as *const c_char );"#,
+                class_name = class.name,
+                method_name = method_name,
+                original_name = original_name,
+            )?;
+        }
+    }
+
+    writeln!(
+        output,
+        r#"
+        {table_name}.replace(table);
+    }});
+}}"#,
+        table_name = table_name
+    )?;
+
+    Ok(())
+}
 fn generate_class_bindings(
     output_types_impls: &mut impl Write,
     output_trait_impls: &mut impl Write,
     output_method_table: &mut impl Write,
+    table_name: &str,
+    namespace: &str,
     api: &Api,
     class: &GodotClass,
 ) -> GeneratorResult {
@@ -114,9 +271,9 @@ fn generate_class_bindings(
 
         if class.instanciable {
             if class.is_refcounted() {
-                generate_reference_ctor(output_types_impls, class)?;
+                generate_reference_ctor(output_types_impls, table_name, namespace, class)?;
             } else {
-                generate_non_reference_ctor(output_types_impls, class)?;
+                generate_non_reference_ctor(output_types_impls, table_name, namespace, class)?;
             }
         }
 
@@ -130,6 +287,8 @@ fn generate_class_bindings(
             output_types_impls,
             &api,
             &mut method_set,
+            table_name,
+            namespace,
             &class.name,
             class.is_pointer_safe(),
             true,
@@ -164,16 +323,6 @@ fn generate_class_bindings(
 
         if class.instanciable {
             generate_instanciable_impl(output_trait_impls, class)?;
-        }
-    }
-
-    // methods and method table
-    {
-        let has_underscore = api.api_underscore.contains(&class.name);
-        generate_method_table(output_method_table, class, has_underscore)?;
-
-        for method in &class.methods {
-            generate_method_impl(output_method_table, class, method)?;
         }
     }
 
