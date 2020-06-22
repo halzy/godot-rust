@@ -15,7 +15,7 @@ pub fn generate_class_struct(class: &GodotClass) -> TokenStream {
         #[allow(non_camel_case_types)]
         #[derive(Debug)]
         pub struct #class_name {
-            this: object::RawObject<Self>,
+            this: gdnative_core::object::RawObject<Self>,
         }
     }
 }

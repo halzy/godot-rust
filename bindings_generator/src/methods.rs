@@ -2,6 +2,7 @@ use crate::api::*;
 use crate::documentation::class_doc_link;
 use crate::rust_safe_name;
 
+use heck::SnakeCase as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
@@ -326,12 +327,13 @@ pub fn generate_methods(
             let rusty_method_name = rename_property_getter(&method_name, &class);
 
             let rusty_name = format_ident!("{}", rusty_method_name);
+            let module = format_ident!("{}", class.name.to_snake_case());
             let function_name = format_ident!("{}_{}", class.name, method_name);
 
             let output = quote! {
                 #[inline]
                 pub fn #rusty_name(&self #params_decl) -> #rust_ret_type {
-                    unsafe { #function_name(self.this.sys().as_ptr() #params_use) }
+                    unsafe { crate::generated::#module::#function_name(self.this.sys().as_ptr() #params_use) }
                 }
             };
             result.extend(output);

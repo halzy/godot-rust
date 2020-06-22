@@ -12,8 +12,6 @@ mod documentation;
 mod methods;
 mod special_methods;
 
-use std::collections::HashSet;
-
 pub use crate::api::*;
 use crate::classes::*;
 pub use crate::dependency::*;
@@ -21,38 +19,69 @@ use crate::documentation::*;
 use crate::methods::*;
 use crate::special_methods::*;
 
-use std::io;
+use heck::SnakeCase as _;
+use rayon::prelude::*;
+
+use std::fs::File;
+use std::io::{self, Write as _};
+use std::path::PathBuf;
 
 pub type GeneratorResult<T = ()> = Result<T, io::Error>;
 
-#[allow(clippy::implicit_hasher)]
-pub fn generate_bindings(ignore: Option<HashSet<String>>) -> TokenStream {
-    let to_ignore = ignore.unwrap_or_default();
+pub fn generate_bindings(api: &mut Api, path: &PathBuf) -> TokenStream {
+    api.classes.par_iter().for_each(|(_, class)| {
+        if !class.is_generated {
+            return;
+        }
 
-    let api = Api::new();
+        let class_code = generate_class_bindings(&api, &class);
 
-    let imports = generate_imports();
+        let output = quote! {
+            use libc;
+            use std::sync::Once;
+            use std::os::raw::c_char;
+            use std::ptr;
+            use std::mem;
 
-    let classes = api.classes.iter().filter_map(|class| {
-        // ignore classes that have been generated before.
-        if to_ignore.contains(&class.name) {
+            use gdnative_core::sys;
+            use gdnative_core::*;
+            use gdnative_core::private::get_api;
+            use gdnative_core::object::PersistentRef;
+
+            use crate::generated::*;
+
+            #class_code
+        };
+
+        let module_name = class.name.to_snake_case();
+        let mut module_path = path.clone();
+        module_path.push(module_name);
+        module_path.set_extension("rs");
+        let file = File::create(module_path).expect("Should be able to open file");
+        write!(&file, "{}", output).expect("Should be able to write");
+    });
+
+    let modules = api.classes.iter().filter_map(|(_, class)| {
+        if !class.is_generated {
             return None;
         }
 
-        Some(generate_class_bindings(&api, &class))
+        let module = format_ident!("{}", class.name.to_snake_case());
+        let class_name = format_ident!("{}", class.name);
+        let enums = class.enums.iter().map(|e| {
+            let enum_name = format_ident!("{}{}", class.name, e.name);
+            quote! { pub use crate::generated::#module::#enum_name; }
+        });
+
+        Some(quote! {
+            pub mod #module;
+            pub use crate::generated::#module::#class_name;
+            #(#enums)*
+        })
     });
 
     quote! {
-        #imports
-        #(#classes)*
-    }
-}
-
-pub fn generate_imports() -> TokenStream {
-    quote! {
-        use std::os::raw::c_char;
-        use std::ptr;
-        use std::mem;
+        #(#modules)*
     }
 }
 

@@ -1,7 +1,5 @@
 use gdnative_bindings_generator::*;
 
-use quote::quote;
-
 use std::env;
 use std::fs::File;
 use std::io::Write as _;
@@ -16,12 +14,14 @@ fn main() {
     {
         let mut output = File::create(&generated_rs).unwrap();
 
-        let classes = strongly_connected_components(&Api::new(), "Object", None);
+        let mut api = Api::new();
+        let include_classes = strongly_connected_components(&mut api, "Object", None);
+        api.classes.iter_mut().for_each(|(class_name, class)| {
+            class.is_generated = include_classes.contains(class_name);
+        });
 
-        let code = classes.iter().map(|class| generate_class(&class));
-        let code = quote! {
-            #(#code)*
-        };
+        let module_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        let code = generate_bindings(&mut api, &module_path);
         write!(&mut output, "{}", code).unwrap();
     }
 

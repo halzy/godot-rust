@@ -7,16 +7,10 @@
 #![allow(clippy::style, clippy::complexity, clippy::perf)]
 
 use super::*;
-use crate::object::{self, PersistentRef};
+use crate as gdnative_core;
+use crate::object::PersistentRef;
 use crate::private::get_api;
 use crate::sys;
 use crate::sys::GodotApi;
-
-use libc;
-use std::ops::*;
-use std::sync::Once;
-
-use std::os::raw::c_char;
-use std::ptr;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));

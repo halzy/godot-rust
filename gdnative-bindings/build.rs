@@ -8,16 +8,20 @@ use std::process::Command;
 
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-
     let output_rs = out_path.join("generated.rs");
 
     {
         let mut output = BufWriter::new(File::create(&output_rs).unwrap());
 
         // gdnative-core already implements all dependencies of Object
-        let to_ignore = strongly_connected_components(&Api::new(), "Object", None);
+        let mut api = Api::new();
+        let to_ignore = strongly_connected_components(&api, "Object", None);
+        api.classes.iter_mut().for_each(|(class_name, class)| {
+            class.is_generated = !to_ignore.contains(class_name);
+        });
 
-        let code = generate_bindings(Some(to_ignore));
+        let module_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        let code = generate_bindings(&mut api, &module_path);
         write!(&mut output, "{}", code).unwrap();
     }
 

@@ -4,10 +4,10 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
+use crate::generated::object::ObjectMethodTable;
 use crate::private::get_api;
 use crate::sys;
 use crate::GodotString;
-use crate::ObjectMethodTable;
 use crate::ToVariant;
 
 #[cfg(feature = "nativescript")]
@@ -641,7 +641,7 @@ impl<T: GodotObject + RefCounted> RawObject<T> {
     /// Increase the reference count of the object.
     #[inline]
     pub fn add_ref(&self) {
-        use crate::ReferenceMethodTable;
+        use crate::generated::reference::ReferenceMethodTable;
 
         let api = crate::private::get_api();
         let addref_method = ReferenceMethodTable::get(api).reference;
@@ -673,7 +673,7 @@ impl<T: GodotObject + RefCounted> RawObject<T> {
     /// reference.
     #[inline]
     pub unsafe fn unref(&self) -> bool {
-        use crate::ReferenceMethodTable;
+        use crate::generated::reference::ReferenceMethodTable;
 
         let api = crate::private::get_api();
         let unref_method = ReferenceMethodTable::get(api).unreference;
@@ -715,7 +715,7 @@ impl<T: GodotObject + RefCounted> RawObject<T> {
     /// This function assumes that no other references are held at the time.
     #[inline]
     pub unsafe fn init_ref_count(&self) {
-        use crate::ReferenceMethodTable;
+        use crate::generated::reference::ReferenceMethodTable;
 
         let obj = self.sys().as_ptr();
 

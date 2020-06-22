@@ -43,7 +43,7 @@ pub mod nativescript;
 #[cfg(feature = "nativescript")]
 pub use nativescript::*;
 
-mod generated;
+pub mod generated;
 mod new_ref;
 #[doc(hidden)]
 pub mod object;

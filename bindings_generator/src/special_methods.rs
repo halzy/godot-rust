@@ -46,7 +46,7 @@ pub fn generate_godot_object_impl(class: &GodotClass) -> TokenStream {
     let persistent_ref = class.persistent_ref();
 
     quote! {
-        impl crate::private::godot_object::Sealed for #class_name {}
+        impl gdnative_core::private::godot_object::Sealed for #class_name {}
 
         unsafe impl GodotObject for #class_name {
             type PersistentRef = #persistent_ref;
@@ -86,7 +86,7 @@ pub fn generate_queue_free_impl(api: &Api, class: &GodotClass) -> TokenStream {
             impl QueueFree for #class_name {
                 #[inline]
                 unsafe fn godot_queue_free(obj: *mut sys::godot_object) {
-                    Node_queue_free(obj)
+                    crate::node::Node_queue_free(obj)
                 }
             }
         }
@@ -120,7 +120,7 @@ pub fn generate_singleton_getter(class: &GodotClass) -> TokenStream {
             unsafe {
                 let this = (get_api().godot_global_get_singleton)(#singleton_name.as_ptr() as *mut _);
                 let this = ptr::NonNull::new(this).expect("singleton should not be null");
-                let this = object::RawObject::from_sys_ref_unchecked::<'static>(this);
+                let this = gdnative_core::object::RawObject::from_sys_ref_unchecked::<'static>(this);
                 Self::cast_ref(this)
             }
         }
@@ -186,7 +186,7 @@ pub fn generate_impl_ref_counted(class: &GodotClass) -> TokenStream {
     let class_name = format_ident!("{}", class.name);
 
     quote! {
-        unsafe impl object::RefCounted for #class_name {}
+        unsafe impl gdnative_core::object::RefCounted for #class_name {}
     }
 }
 
@@ -199,7 +199,7 @@ pub fn generate_impl_manually_managed(class: &GodotClass) -> TokenStream {
     let class_name = format_ident!("{}", class.name);
 
     quote! {
-        unsafe impl object::ManuallyManaged for #class_name {}
+        unsafe impl gdnative_core::object::ManuallyManaged for #class_name {}
     }
 }
 
@@ -218,7 +218,7 @@ pub fn generate_gdnative_library_singleton_getter(class: &GodotClass) -> TokenSt
             unsafe {
                 let this = gdnative_core::private::get_gdnative_library_sys();
                 let this = ptr::NonNull::new(this).expect("singleton should not be null");
-                let this = object::RawObject::from_sys_ref_unchecked(this);
+                let this = gdnative_core::object::RawObject::from_sys_ref_unchecked(this);
                 Self::cast_ref(this)
             }
         }

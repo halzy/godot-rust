@@ -1,33 +1,53 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+fn strip_leading_underscores(mut classes: Vec<GodotClass>) -> (Vec<GodotClass>, HashSet<String>) {
+    let mut api_underscore = HashSet::default();
+
+    for class in &mut classes {
+        if class.name.starts_with('_') {
+            class.name = class.name[1..].to_string();
+            api_underscore.insert(class.name.clone());
+        }
+        for method in &mut class.methods {
+            if method.return_type.starts_with('_') {
+                method.return_type = method.return_type[1..].to_string();
+            }
+            for arg in &mut method.arguments {
+                if arg.ty.starts_with('_') {
+                    arg.ty = arg.ty[1..].to_string();
+                }
+            }
+        }
+    }
+
+    (classes, api_underscore)
+}
 
 pub struct Api {
-    pub classes: Vec<GodotClass>,
+    pub classes: BTreeMap<String, GodotClass>,
     pub api_underscore: HashSet<String>,
 }
 
 impl Api {
     pub fn new() -> Self {
-        let mut api = Api {
-            classes: serde_json::from_str(get_api_json())
-                .expect("Failed to parse the API description"),
-            api_underscore: Default::default(),
-        };
+        let classes =
+            serde_json::from_str(get_api_json()).expect("Failed to parse the API description");
 
-        api.strip_leading_underscores();
+        let (classes, api_underscore) = strip_leading_underscores(classes);
 
-        api
+        Self {
+            classes: classes
+                .into_iter()
+                .map(|c| (c.name.to_owned(), c))
+                .collect(),
+            api_underscore,
+        }
     }
 
     pub fn find_class<'a, 'b>(&'a self, name: &'b str) -> Option<&'a GodotClass> {
-        for class in &self.classes {
-            if class.name == name {
-                return Some(class);
-            }
-        }
-
-        None
+        self.classes.get(name)
     }
 
     pub fn class_inherits(&self, class: &GodotClass, base_class_name: &str) -> bool {
@@ -41,25 +61,6 @@ impl Api {
 
         false
     }
-
-    fn strip_leading_underscores(&mut self) {
-        for class in &mut self.classes {
-            if class.name.starts_with('_') {
-                class.name = class.name[1..].to_string();
-                self.api_underscore.insert(class.name.clone());
-            }
-            for method in &mut class.methods {
-                if method.return_type.starts_with('_') {
-                    method.return_type = method.return_type[1..].to_string();
-                }
-                for arg in &mut method.arguments {
-                    if arg.ty.starts_with('_') {
-                        arg.ty = arg.ty[1..].to_string();
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Default for Api {
@@ -68,7 +69,7 @@ impl Default for Api {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct GodotClass {
     pub name: String,
     pub base_class: String,
@@ -77,6 +78,8 @@ pub struct GodotClass {
     pub is_reference: bool,
     #[serde(rename = "instanciable")]
     pub instantiable: bool,
+    #[serde(default)]
+    pub is_generated: bool,
 
     pub properties: Vec<Property>,
     pub methods: Vec<GodotMethod>,
@@ -101,10 +104,22 @@ impl GodotClass {
         let self_ty = format_ident!("{}", self.name);
 
         if self.is_refcounted() {
-            syn::parse_quote!(object::Ref<#self_ty>)
+            syn::parse_quote!(gdnative_core::object::Ref<#self_ty>)
         } else {
-            syn::parse_quote!(object::Ptr<#self_ty>)
+            syn::parse_quote!(gdnative_core::object::Ptr<#self_ty>)
         }
+    }
+}
+
+impl std::cmp::Ord for GodotClass {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name.cmp(&other.name)
+    }
+}
+
+impl std::cmp::PartialOrd for GodotClass {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.name.cmp(&other.name))
     }
 }
 
@@ -129,7 +144,7 @@ impl core::cmp::PartialOrd for Enum {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Property {
     pub name: String,
     #[serde(rename = "type")]
@@ -139,7 +154,7 @@ pub struct Property {
     pub index: i64,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct GodotMethod {
     pub name: String,
     pub return_type: String,
@@ -182,7 +197,7 @@ impl GodotMethod {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct GodotArgument {
     pub name: String,
     #[serde(rename = "type")]
@@ -316,7 +331,9 @@ impl Ty {
                 syn::parse_quote! { #name }
             }
             Ty::Object(ref name) => {
-                let class = api.find_class(name).expect("should be able to find class");
+                let class = api
+                    .find_class(name)
+                    .unwrap_or_else(|| panic!("should be able to find class {}", name));
                 let persistent_ref = class.persistent_ref();
                 syn::parse_quote! { Option<#persistent_ref> }
             }
