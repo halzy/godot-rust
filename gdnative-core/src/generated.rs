@@ -8,9 +8,6 @@
 
 use super::*;
 use crate as gdnative_core;
-use crate::object::PersistentRef;
-use crate::private::get_api;
-use crate::sys;
 use crate::sys::GodotApi;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));

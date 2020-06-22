@@ -8,10 +8,10 @@ use std::process::Command;
 
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let output_rs = out_path.join("generated.rs");
+    let generated_rs = out_path.join("generated.rs");
 
     {
-        let mut output = BufWriter::new(File::create(&output_rs).unwrap());
+        let mut output = BufWriter::new(File::create(&generated_rs).unwrap());
 
         // gdnative-core already implements all dependencies of Object
         let mut api = Api::new();
@@ -20,21 +20,20 @@ fn main() {
             class.is_generated = !to_ignore.contains(class_name);
         });
 
-        let module_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-        let code = generate_bindings(&mut api, &module_path);
+        let code = generate_bindings(&mut api, &mut output);
         write!(&mut output, "{}", code).unwrap();
     }
 
     print!(
         "Formatting generated file: {}... ",
-        output_rs.file_name().map(|s| s.to_str()).flatten().unwrap()
+        generated_rs.file_name().map(|s| s.to_str()).flatten().unwrap()
     );
     match Command::new("rustup")
         .arg("run")
         .arg("stable")
         .arg("rustfmt")
         .arg("--edition=2018")
-        .arg(output_rs)
+        .arg(generated_rs)
         .output()
     {
         Ok(_) => println!("Done"),

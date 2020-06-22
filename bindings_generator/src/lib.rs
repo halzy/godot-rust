@@ -22,13 +22,16 @@ use crate::special_methods::*;
 use heck::SnakeCase as _;
 use rayon::prelude::*;
 
-use std::fs::File;
-use std::io::{self, Write as _};
-use std::path::PathBuf;
+use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
 
 pub type GeneratorResult<T = ()> = Result<T, io::Error>;
 
-pub fn generate_bindings(api: &mut Api, path: &PathBuf) -> TokenStream {
+pub fn generate_bindings<W>(api: &mut Api, output: &mut W) -> TokenStream 
+    where W: Write + Send + Sync
+{
+    let file = Arc::new(Mutex::new(output));
+
     api.classes.par_iter().for_each(|(_, class)| {
         if !class.is_generated {
             return;
@@ -36,29 +39,21 @@ pub fn generate_bindings(api: &mut Api, path: &PathBuf) -> TokenStream {
 
         let class_code = generate_class_bindings(&api, &class);
 
+        let module = format_ident!("{}", class.name.to_snake_case());
         let output = quote! {
-            use libc;
-            use std::sync::Once;
-            use std::os::raw::c_char;
-            use std::ptr;
-            use std::mem;
+            pub mod #module {
+                use super::*;
 
-            use gdnative_core::sys;
-            use gdnative_core::*;
-            use gdnative_core::private::get_api;
-            use gdnative_core::object::PersistentRef;
-
-            use crate::generated::*;
-
-            #class_code
+                #class_code
+            }
         };
 
-        let module_name = class.name.to_snake_case();
-        let mut module_path = path.clone();
-        module_path.push(module_name);
-        module_path.set_extension("rs");
-        let file = File::create(module_path).expect("Should be able to open file");
-        write!(&file, "{}", output).expect("Should be able to write");
+        // let module_name = class.name.to_snake_case();
+        // let mut module_path = path.clone();
+        // module_path.push(module_name);
+        // module_path.set_extension("rs");
+        // let file = File::create(module_path).expect("Should be able to open file");
+        write!(&mut file.lock().unwrap(), "{}", output).expect("Should be able to write");
     });
 
     let modules = api.classes.iter().filter_map(|(_, class)| {
@@ -74,13 +69,23 @@ pub fn generate_bindings(api: &mut Api, path: &PathBuf) -> TokenStream {
         });
 
         Some(quote! {
-            pub mod #module;
             pub use crate::generated::#module::#class_name;
             #(#enums)*
         })
     });
 
     quote! {
+        use libc;
+        use std::sync::Once;
+        use std::os::raw::c_char;
+        use std::ptr;
+        use std::mem;
+
+        use gdnative_core::sys;
+        use gdnative_core::*;
+        use gdnative_core::private::get_api;
+        use gdnative_core::object::PersistentRef;
+
         #(#modules)*
     }
 }
