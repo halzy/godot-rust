@@ -406,8 +406,6 @@ mod impl_export {
     impl_export_for_core_type_without_hint!(Transform);
     impl_export_for_core_type_without_hint!(NodePath);
     impl_export_for_core_type_without_hint!(Rid);
-    impl_export_for_core_type_without_hint!(Dictionary);
-    impl_export_for_core_type_without_hint!(VariantArray);
     impl_export_for_core_type_without_hint!(ByteArray);
     impl_export_for_core_type_without_hint!(Int32Array);
     impl_export_for_core_type_without_hint!(Float32Array);
@@ -415,6 +413,22 @@ mod impl_export {
     impl_export_for_core_type_without_hint!(Vector2Array);
     impl_export_for_core_type_without_hint!(Vector3Array);
     impl_export_for_core_type_without_hint!(ColorArray);
+
+    impl Export for Dictionary<Shared> {
+        type Hint = ();
+        #[inline]
+        fn export_info(_hint: Option<Self::Hint>) -> ExportInfo {
+            ExportInfo::new(VariantType::Dictionary)
+        }
+    }
+
+    impl Export for VariantArray<Shared> {
+        type Hint = ();
+        #[inline]
+        fn export_info(_hint: Option<Self::Hint>) -> ExportInfo {
+            ExportInfo::new(VariantType::VariantArray)
+        }
+    }
 
     impl Export for Color {
         type Hint = hint::ColorHint;

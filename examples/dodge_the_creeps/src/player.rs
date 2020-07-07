@@ -86,7 +86,7 @@ impl Player {
     }
 
     #[export]
-    fn on_player_body_entered(&self, owner: &Area2D, _body: Ref<PhysicsBody2D>) {
+    fn on_player_body_entered(&self, owner: &Area2D, _body: Ref<PhysicsBody2D, Shared>) {
         owner.hide();
         owner.emit_signal("hit", &[]);
 

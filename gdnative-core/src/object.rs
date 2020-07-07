@@ -246,7 +246,7 @@ pub trait QueueFree: GodotObject {
 /// Many trait implementations for `Ref` are conditional, dependent on the type parameters.
 /// When viewing rustdoc documentation, you may expand the documentation on their respective
 /// `impl` blocks  for more detailed explanations of the trait bounds.
-pub struct Ref<T: GodotObject, Access: ThreadAccess = Shared> {
+pub struct Ref<T: GodotObject, Access: ThreadAccess> {
     ptr: <T::RefKind as RefKindSpec>::PtrWrapper,
     _marker: PhantomData<(*const T, Access)>,
 }
@@ -786,7 +786,7 @@ impl<T: GodotObject, Access: ThreadAccess> Ref<T, Access> {
 ///
 /// It's possible to use `TRef` as the `owner` argument in NativeScript methods. This can make
 /// passing `owner` to methods easier.
-pub struct TRef<'a, T: GodotObject, Access: ThreadAccess = Shared> {
+pub struct TRef<'a, T: GodotObject, Access: ThreadAccess> {
     obj: &'a T,
     _marker: PhantomData<Access>,
 }

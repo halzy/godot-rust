@@ -33,7 +33,7 @@ use crate::thread_access::*;
 /// safe.
 ///
 /// [thread-safety]: https://docs.godotengine.org/en/stable/tutorials/threads/thread_safe_apis.html
-pub struct Dictionary<Access: ThreadAccess = Shared> {
+pub struct Dictionary<Access: ThreadAccess> {
     sys: sys::godot_dictionary,
 
     /// Marker preventing the compiler from incorrectly deriving `Send` and `Sync`.

@@ -32,7 +32,7 @@ use std::fmt;
 /// safe.
 ///
 /// [thread-safety]: https://docs.godotengine.org/en/stable/tutorials/threads/thread_safe_apis.html
-pub struct VariantArray<Access: ThreadAccess = Shared> {
+pub struct VariantArray<Access: ThreadAccess> {
     sys: sys::godot_array,
 
     /// Marker preventing the compiler from incorrectly deriving `Send` and `Sync`.

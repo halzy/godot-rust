@@ -66,7 +66,7 @@ impl SignalSubscriber {
     }
 
     #[export]
-    fn _ready(&mut self, owner: TRef<Label>) {
+    fn _ready(&mut self, owner: TRef<Label, Shared>) {
         let emitter = &mut owner.get_node("../SignalEmitter").unwrap();
         let emitter = unsafe { emitter.assume_safe() };
 

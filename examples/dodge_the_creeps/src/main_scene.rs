@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 #[user_data(user_data::LocalCellData<Main>)]
 pub struct Main {
     #[property]
-    mob: Ref<PackedScene>,
+    mob: Ref<PackedScene, Shared>,
     score: i64,
 }
 

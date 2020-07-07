@@ -9,6 +9,7 @@ use crate::core_types::{
     Color, GodotString, VariantArray, Vector2, Vector2Godot, Vector3, Vector3Godot,
 };
 use crate::private::get_api;
+use crate::thread_access;
 use crate::NewRef;
 
 /// A reference-counted CoW typed vector using Godot's pool allocator, generic over possible
@@ -86,7 +87,7 @@ impl<T: Element> TypedArray<T> {
 
     /// Creates from a `VariantArray` by making a best effort to convert each variant.
     #[inline]
-    pub fn from_variant_array(array: &VariantArray) -> Self {
+    pub fn from_variant_array(array: &VariantArray<thread_access::Shared>) -> Self {
         unsafe {
             let mut inner = T::SysArray::default();
             (T::new_with_array_fn(get_api()))(&mut inner, array.sys());
