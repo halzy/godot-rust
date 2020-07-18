@@ -347,7 +347,7 @@ impl<T: NativeClass> Instance<T, Shared> {
     /// It's safe to call `assume_safe` only if the constraints of `Ref::assume_safe`
     /// are satisfied for the base object.
     #[inline]
-    pub unsafe fn assume_safe<'a, 'r>(&'r self) -> RefInstance<'a, T, Shared>
+    pub unsafe fn assume_safe<'a, 'r: 'a>(&'r self) -> RefInstance<'a, T, Shared>
     where
         AssumeSafeLifetime<'a, 'r>: LifetimeConstraint<<T::Base as GodotObject>::RefKind>,
     {

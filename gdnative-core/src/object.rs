@@ -86,7 +86,7 @@ pub unsafe trait GodotObject: Sized + crate::private::godot_object::Sealed {
     }
 
     /// Creates a reference to `Self` given a `RawObject` reference. This is an internal
-    /// interface,
+    /// interface.
     #[doc(hidden)]
     #[inline]
     fn cast_ref(raw: &RawObject<Self>) -> &Self {
@@ -481,7 +481,7 @@ impl<T: GodotObject> Ref<T, Shared> {
     ///
     /// [thread-safety]: https://docs.godotengine.org/en/stable/tutorials/threads/thread_safe_apis.html
     #[inline(always)]
-    pub unsafe fn assume_safe<'a, 'r>(&'r self) -> TRef<'a, T, Shared>
+    pub unsafe fn assume_safe<'a, 'r: 'a>(&'r self) -> TRef<'a, T, Shared>
     where
         AssumeSafeLifetime<'a, 'r>: LifetimeConstraint<T::RefKind>,
     {
@@ -531,12 +531,24 @@ impl<T: GodotObject<RefKind = ManuallyManaged>> Ref<T, Shared> {
     /// guarantee that the operation is safe.**
     #[inline]
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub unsafe fn assume_safe_if_sane<'a>(&self) -> Option<TRef<'a, T, Shared>> {
+    pub unsafe fn assume_safe_if_sane<'a>(&'a self) -> Option<TRef<'a, T, Shared>> {
         if self.is_instance_sane() {
             Some(self.assume_safe_unchecked())
         } else {
             None
         }
+    }
+
+    /// Assume that `self` is safe to use, if a sanity check using `is_instance_sane` passed.
+    ///
+    /// # Safety
+    ///
+    /// The same safety constraints as `assume_safe` applies. **The sanity check does NOT
+    /// guarantee that the operation is safe.**
+    #[inline]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub unsafe fn assume_safe_if_sane_ref<'a>(&'a self) -> Option<&'a TRef<'a, T, Shared>> {
+        self.assume_safe_if_sane().map(|t| std::mem::transmute(t))
     }
 
     /// Assume that `self` is the unique reference to the underlying object, if a sanity check
@@ -767,7 +779,7 @@ impl<T: GodotObject, Access: ThreadAccess> Ref<T, Access> {
     /// The same safety constraints as `assume_safe` applies.
     #[doc(hidden)]
     #[inline(always)]
-    pub unsafe fn assume_safe_unchecked<'a>(&self) -> TRef<'a, T, Access> {
+    pub unsafe fn assume_safe_unchecked<'a>(&'a self) -> TRef<'a, T, Access> {
         TRef::new(T::cast_ref(self.as_raw_unchecked()))
     }
 }
@@ -1068,7 +1080,7 @@ pub trait RefKindSpec: Sized {
 
     #[doc(hidden)]
     unsafe fn impl_assume_safe<'a, T: GodotObject<RefKind = Self>>(
-        this: &Ref<T, Shared>,
+        this: &'a Ref<T, Shared>,
     ) -> TRef<'a, T, Shared>
     where
         Self: RefKind;
@@ -1096,7 +1108,7 @@ impl RefKindSpec for ManuallyManaged {
 
     #[inline(always)]
     unsafe fn impl_assume_safe<'a, T: GodotObject<RefKind = Self>>(
-        this: &Ref<T, Shared>,
+        this: &'a Ref<T, Shared>,
     ) -> TRef<'a, T, Shared> {
         debug_assert!(
             this.is_instance_sane(),
@@ -1127,7 +1139,7 @@ impl RefKindSpec for RefCounted {
 
     #[inline(always)]
     unsafe fn impl_assume_safe<'a, T: GodotObject<RefKind = Self>>(
-        this: &Ref<T, Shared>,
+        this: &'a Ref<T, Shared>,
     ) -> TRef<'a, T, Shared> {
         this.assume_safe_unchecked()
     }
@@ -1203,11 +1215,11 @@ pub trait LifetimeConstraint<Kind: RefKind> {}
 
 /// Type used to check lifetime constraint depending on `RefKind`. Internal interface.
 #[doc(hidden)]
-pub struct AssumeSafeLifetime<'a, 'r> {
+pub struct AssumeSafeLifetime<'a, 'r: 'a> {
     _marker: PhantomData<(&'a (), &'r ())>,
 }
 
-impl<'a, 'r> LifetimeConstraint<ManuallyManaged> for AssumeSafeLifetime<'a, 'r> {}
+impl<'a, 'r: 'a> LifetimeConstraint<ManuallyManaged> for AssumeSafeLifetime<'a, 'r> {}
 impl<'a, 'r: 'a> LifetimeConstraint<RefCounted> for AssumeSafeLifetime<'a, 'r> {}
 
 mod private {
