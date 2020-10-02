@@ -17,7 +17,7 @@ pub(crate) struct DeriveData {
     pub(crate) no_constructor: bool,
 }
 
-fn impl_empty_nativeclass(derive_input: &DeriveInput) -> TokenStream2 {
+pub(crate) fn impl_empty_nativeclass(derive_input: &DeriveInput) -> TokenStream2 {
     let name = &derive_input.ident;
 
     quote! {
@@ -35,28 +35,10 @@ fn impl_empty_nativeclass(derive_input: &DeriveInput) -> TokenStream2 {
     }
 }
 
-pub(crate) fn derive_native_class(input: TokenStream) -> TokenStream {
-    let derive_input = match syn::parse_macro_input::parse::<DeriveInput>(input) {
-        Ok(val) => val,
-        Err(err) => {
-            return err.to_compile_error().into();
-        }
-    };
+pub(crate) fn derive_native_class(input: TokenStream) -> Result<TokenStream, syn::Error> {
+    let derive_input = syn::parse_macro_input::parse::<DeriveInput>(input)?;
 
-    let data = match parse_derive_input(&derive_input) {
-        Ok(val) => val,
-        Err(err) => {
-            // Silence the other errors that happen because NativeClass is not implemented
-            let empty_nativeclass = impl_empty_nativeclass(&derive_input);
-
-            let error = quote! {
-                #empty_nativeclass
-                #err
-            };
-
-            return error.into();
-        }
-    };
+    let data = parse_derive_input(&derive_input)?;
 
     // generate NativeClass impl
     let trait_impl = {
@@ -149,10 +131,10 @@ pub(crate) fn derive_native_class(input: TokenStream) -> TokenStream {
     };
 
     // create output token stream
-    trait_impl.into()
+    Ok(trait_impl.into())
 }
 
-fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
+fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, syn::Error> {
     let span = proc_macro2::Span::call_site();
 
     let ident = input.ident.clone();
@@ -161,30 +143,23 @@ fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
         .attrs
         .iter()
         .find(|a| a.path.is_ident("inherit"))
-        .ok_or_else(|| {
-            syn::Error::new(span, "No \"inherit\" attribute found").to_compile_error()
-        })?;
+        .ok_or_else(|| syn::Error::new(span, "No \"inherit\" attribute found"))?;
 
     // read base class
-    let base = inherit_attr
-        .parse_args::<Type>()
-        .map_err(|err| err.to_compile_error())?;
+    let base = inherit_attr.parse_args::<Type>()?;
 
     let register_callback = input
         .attrs
         .iter()
         .find(|a| a.path.is_ident("register_with"))
-        .map(|attr| attr.parse_args::<Path>().map_err(|e| e.to_compile_error()))
+        .map(|attr| attr.parse_args::<Path>())
         .transpose()?;
 
     let user_data = input
         .attrs
         .iter()
         .find(|a| a.path.is_ident("user_data"))
-        .map(|attr| {
-            attr.parse_args::<Type>()
-                .map_err(|err| err.to_compile_error())
-        })
+        .map(|attr| attr.parse_args::<Type>())
         .unwrap_or_else(|| {
             Ok(syn::parse2::<Type>(
                 quote! { ::gdnative::nativescript::user_data::DefaultUserData<#ident> },
@@ -201,10 +176,10 @@ fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
     let struct_data = if let Data::Struct(data) = &input.data {
         data
     } else {
-        return Err(
-            syn::Error::new(span, "NativeClass derive macro only works on structs.")
-                .to_compile_error(),
-        );
+        return Err(syn::Error::new(
+            span,
+            "NativeClass derive macro only works on structs.",
+        ));
     };
 
     // Find all fields with a `#[property]` attribute
@@ -219,7 +194,7 @@ fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
                     continue;
                 }
 
-                let meta = attr.parse_meta().map_err(|e| e.to_compile_error())?;
+                let meta = attr.parse_meta()?;
 
                 match meta {
                     Meta::List(MetaList { nested, .. }) => {
@@ -228,12 +203,10 @@ fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
 
                         for arg in &nested {
                             if let NestedMeta::Meta(Meta::NameValue(ref pair)) = arg {
-                                attr_args_builder
-                                    .add_pair(pair)
-                                    .map_err(|err| err.to_compile_error())?;
+                                attr_args_builder.add_pair(pair)?;
                             } else {
                                 let msg = format!("Unexpected argument: {:?}", arg);
-                                return Err(syn::Error::new(arg.span(), msg).to_compile_error());
+                                return Err(syn::Error::new(arg.span(), msg));
                             }
                         }
                     }
@@ -242,15 +215,16 @@ fn parse_derive_input(input: &DeriveInput) -> Result<DeriveData, TokenStream2> {
                     }
                     m => {
                         let msg = format!("Unexpected meta variant: {:?}", m);
-                        return Err(syn::Error::new(m.span(), msg).to_compile_error());
+                        return Err(syn::Error::new(m.span(), msg));
                     }
                 }
             }
 
             if let Some(builder) = property_args {
-                let ident = field.ident.clone().ok_or_else(|| {
-                    syn::Error::new(field.ident.span(), "Fields should be named").to_compile_error()
-                })?;
+                let ident = field
+                    .ident
+                    .clone()
+                    .ok_or_else(|| syn::Error::new(field.ident.span(), "Fields should be named"))?;
                 properties.insert(ident, builder.done());
             }
         }
