@@ -7,7 +7,7 @@ extern crate quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use syn::{AttributeArgs, ItemFn, ItemImpl};
+use syn::{AttributeArgs, DeriveInput, ItemFn, ItemImpl};
 
 mod methods;
 mod native_script;
@@ -16,34 +16,26 @@ mod variant;
 
 #[proc_macro_attribute]
 pub fn methods(meta: TokenStream, input: TokenStream) -> TokenStream {
-    match syn::parse_macro_input::parse::<syn::parse::Nothing>(meta.clone()) {
-        Ok(_) => {}
-        Err(_) => {
-            let err = syn::Error::new_spanned(
-                TokenStream2::from(meta),
-                "#[methods] does not take parameters.",
-            );
-            return error_with_input(input, err);
-        }
-    };
+    if syn::parse::<syn::parse::Nothing>(meta.clone()).is_err() {
+        let err = syn::Error::new_spanned(
+            TokenStream2::from(meta),
+            "#[methods] does not take parameters.",
+        );
+        return error_with_input(input, err);
+    }
 
-    let impl_block = match syn::parse_macro_input::parse::<ItemImpl>(input.clone()) {
+    let impl_block = match syn::parse::<ItemImpl>(input.clone()) {
         Ok(impl_block) => impl_block,
         Err(err) => return error_with_input(input, err),
     };
 
     fn error_with_input(input: TokenStream, err: syn::Error) -> TokenStream {
-        let input = proc_macro2::TokenStream::from(input);
-        let err = err.to_compile_error();
-
-        let tokens = quote! {
-            #input
-            #err
-        };
-        return tokens.into();
+        let mut err = TokenStream::from(err.to_compile_error());
+        err.extend(std::iter::once(input));
+        return err;
     }
 
-    methods::derive_methods(impl_block).into()
+    TokenStream::from(methods::derive_methods(impl_block))
 }
 
 /// Makes a function profiled in Godot's built-in profiler. This macro automatically
@@ -176,29 +168,22 @@ pub fn profiled(meta: TokenStream, input: TokenStream) -> TokenStream {
 pub fn derive_native_class(input: TokenStream) -> TokenStream {
     // Converting the proc_macro::TokenStream into non proc_macro types so that tests
     // can be written against the inner functions.
-    let derive_input = match syn::parse_macro_input::parse::<syn::DeriveInput>(input) {
-        Ok(derive_input) => derive_input,
-        Err(err) => {
-            return err.to_compile_error().into();
-        }
-    };
+    let derive_input = syn::parse_macro_input!(input as DeriveInput);
 
     // Implement NativeClass for the input
-    match native_script::derive_native_class(&derive_input) {
-        Ok(stream) => stream,
-        Err(err) => {
+    native_script::derive_native_class(&derive_input).map_or_else(
+        |err| {
             // Silence the other errors that happen because NativeClass is not implemented
             let empty_nativeclass = native_script::impl_empty_nativeclass(&derive_input);
             let err = err.to_compile_error();
 
-            let error = quote! {
+            TokenStream::from(quote! {
                 #empty_nativeclass
                 #err
-            };
-
-            error.into()
-        }
-    }
+            })
+        },
+        std::convert::identity,
+    )
 }
 
 #[proc_macro_derive(ToVariant, attributes(variant))]
