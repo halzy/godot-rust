@@ -16,21 +16,24 @@ defaults:
     shell: bash
 
 jobs:
-##  clippy:
-##    runs-on: ubuntu-latest
-##    strategy:
-##      matrix:
-##        include:
-##          - rust: stable
-##          - rust: nightly
-##    steps:
-##      - uses: actions/checkout@v2
-##      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
-##        with:
-##          profile: minimal
-##          toolchain: ${{ matrix.rust }}
-##          components: clippy
-##      - run: cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
+  clippy:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      matrix:
+        include:
+          - rust: stable
+            experimental: false
+          - rust: nightly
+            experimental: true
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          components: clippy
+      - run: cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
 
   rustfmt:
     runs-on: ubuntu-latest
@@ -41,20 +44,26 @@ jobs:
           profile: minimal
           toolchain: stable
           components: rustfmt
-      - run: cargo fmt --all -- --check;
+      - name: Checking rustfmt
+        run: cargo fmt --all -- --check;
 
   test:
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         include:
           - rust: stable
             os: ubuntu-latest
+            experimental: false
           - rust: nightly
             os: ubuntu-latest
+            experimental: true
           - rust: stable
             os: windows-latest
+            experimental: false
           - rust: nightly
             os: windows-latest
+            experimental: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -70,17 +79,22 @@ jobs:
       # cargo test --target x86_64-pc-windows-msvc --all --all-features;
 
   build_release:
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         include:
           - rust: stable
             os: ubuntu-latest
+            experimental: false
           - rust: nightly
             os: ubuntu-latest
+            experimental: true
           - rust: stable
             os: windows-latest
+            experimental: false
           - rust: nightly
             os: windows-latest
+            experimental: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -96,13 +110,16 @@ jobs:
       # cargo build --target x86_64-pc-windows-msvc --release;
 
   godot_test:
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         include:
           - rust: stable
             os: ubuntu-latest
+            experimental: false
           - rust: nightly
             os: ubuntu-latest
+            experimental: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -114,11 +131,16 @@ jobs:
         with:
           version: 10.0
           directory: ${{ runner.temp }}/llvm
-      - run: |
+      - name: Installing Godot
+        run: |
           wget "https://downloads.tuxfamily.org/godotengine/$GODOT_VER/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64.zip" -O /tmp/godot.zip
           unzip /tmp/godot.zip -d ${{ runner.temp }}/godot_bin
+      - name: Building Godot-Rust
+        run: |
           cd test;
           cargo build;
+      - name: Running Godot Tests
+        run: |
           mkdir -p ./project/lib;
           cp ../target/debug/libgdnative_test.so ./project/lib/;
           "${{ runner.temp }}/godot_bin/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
@@ -139,7 +161,7 @@ jobs:
     name: ci
     if: github.event_name == 'push' && success()
     needs:
-      # clippy
+      - clippy
       - rustfmt
       - test
       - build_release
