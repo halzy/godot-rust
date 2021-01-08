@@ -55,10 +55,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
-      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
         with:
           profile: minimal
           toolchain: stable
+      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
       - run: cargo test --all --all-features;
       # cargo test --target x86_64-pc-windows-msvc --all --all-features;
 
@@ -78,10 +78,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
-      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
         with:
           profile: minimal
           toolchain: stable
+      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
       - run: cargo build --release;
       # cargo build --target x86_64-pc-windows-msvc --release;
 
