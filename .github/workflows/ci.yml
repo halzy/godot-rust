@@ -12,32 +12,55 @@ defaults:
     shell: bash
 
 jobs:
-  clippy:
+##  clippy:
+##    runs-on: ubuntu-latest
+##    strategy:
+##      matrix:
+##        include:
+##          - rust: stable
+##          - rust: nightly
+##    steps:
+##      - uses: actions/checkout@v2
+##      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+##        with:
+##          profile: minimal
+##          toolchain: ${{ matrix.rust }}
+##          components: clippy
+##      - run: cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
+
+  rustfmt:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - rust: stable
-          - rust: nightly
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
-          components: clippy
-      - run: cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
+          toolchain: stable
+          components: rustfmt
+      - run: cargo fmt --all -- --check;
 
-#  rustfmt:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
-#        with:
-#          profile: minimal
-#          toolchain: stable
-#          components: rustfmt
-#      - run: cargo fmt --all -- --check;
+  test:
+    strategy:
+      matrix:
+        include:
+          - rust: stable
+            os: ubuntu-latest
+          - rust: nightly
+            os: ubuntu-latest
+          - rust: stable
+            os: windows-latest
+          - rust: nightly
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
+        with:
+          profile: minimal
+          toolchain: stable
+      - run: cargo test --all --all-features;
+      # cargo test --target x86_64-pc-windows-msvc --all --all-features;
 
   build_release:
     strategy:
@@ -55,11 +78,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
         with:
           profile: minimal
           toolchain: stable
-          components: rustfmt
       - run: cargo build --release;
+      # cargo build --target x86_64-pc-windows-msvc --release;
 
   # This job doesn't actually test anything, but they're used to tell bors the
   # build completed, as there is no practical way to detect when a workflow is
@@ -71,8 +95,8 @@ jobs:
     name: ci
     if: github.event_name == 'push' && success()
     needs:
-      # rustfmt
-      - clippy
+      - rustfmt
+      # clippy
       - build_release
     runs-on: ubuntu-latest
     steps:
