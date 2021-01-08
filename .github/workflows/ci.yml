@@ -117,18 +117,17 @@ jobs:
       - run: |
           wget "https://downloads.tuxfamily.org/godotengine/$GODOT_VER/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64.zip" -O /tmp/godot.zip
           unzip /tmp/godot.zip -d ${{ runner.temp }}/godot_bin
-          export PATH=$PATH:$PWD/${{ runner.temp }}/godot_bin/
           cd test;
           cargo build;
           mkdir -p ./project/lib;
           cp ../target/debug/libgdnative_test.so ./project/lib/;
-          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
-          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
+          "${{ runner.temp }}/godot_bin/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
+          "${{ runner.temp }}/godot_bin/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
           cargo build --features=type_tag_fallback;
           mkdir -p ./project/lib;
           cp ../target/debug/libgdnative_test.so ./project/lib/;
-          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
-          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
+          "${{ runner.temp }}/godot_bin/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
+          "${{ runner.temp }}/godot_bin/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
           
   # This job doesn't actually test anything, but they're used to tell bors the
   # build completed, as there is no practical way to detect when a workflow is
