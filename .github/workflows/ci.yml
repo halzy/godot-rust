@@ -28,6 +28,39 @@ jobs:
           components: clippy
       - run: cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
 
+#  rustfmt:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          components: rustfmt
+#      - run: cargo fmt --all -- --check;
+
+  build_release:
+    strategy:
+      matrix:
+        include:
+          - rust: stable
+            os: ubuntu-latest
+          - rust: nightly
+            os: ubuntu-latest
+          - rust: stable
+            os: windows-latest
+          - rust: nightly
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt
+      - run: cargo build --release;
+
   # This job doesn't actually test anything, but they're used to tell bors the
   # build completed, as there is no practical way to detect when a workflow is
   # successful listening to webhooks only.
@@ -38,7 +71,9 @@ jobs:
     name: ci
     if: github.event_name == 'push' && success()
     needs:
+      # rustfmt
       - clippy
+      - build_release
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success

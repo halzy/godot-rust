@@ -13,29 +13,10 @@ matrix:
   fast_finish: true
 
   include:
-    - name: cargo fmt
-      os: linux
-      rust: stable
-      env: CI_STAGE_CARGO_FMT=yes
-      before_script:
-       - rustup component add rustfmt
-
-    - name: cargo clippy (stable)
-      os: linux
-      rust: stable
-      env: CI_STAGE_CARGO_CLIPPY=yes
-      before_script:
-       - rustup component add clippy
-
     - name: cargo test (stable)
       os: linux
       rust: stable
       env: CI_STAGE_CARGO_TEST=yes
-
-    - name: cargo build --release (stable)
-      os: linux
-      rust: stable
-      env: CI_STAGE_BUILD_RELEASE=yes
 
     - name: Godot test (stable)
       os: linux
@@ -50,18 +31,6 @@ matrix:
       os: linux
       rust: nightly
       env: CI_STAGE_CARGO_TEST=yes
-
-    - name: cargo clippy (nightly)
-      os: linux
-      rust: nightly
-      env: CI_STAGE_CARGO_CLIPPY=yes
-      before_script:
-       - rustup component add clippy
-
-    - name: cargo build --release (nightly)
-      os: linux
-      rust: nightly
-      env: CI_STAGE_BUILD_RELEASE=yes
 
     - name: Godot test (nightly)
       os: linux
@@ -114,10 +83,6 @@ matrix:
        - cp cargo-dinghy-macos/cargo-dinghy $HOME/.cargo/bin
 
 script:
-  - if [[ "$CI_STAGE_CARGO_FMT" == "yes" ]]; then
-      cargo fmt --all -- --check;
-    fi
-
   - if [[ "$CI_STAGE_IOS_SIMULATOR_TEST" == "yes" ]]; then
       RUNTIME_ID=$(xcrun simctl list runtimes | grep iOS | cut -d ' ' -f 7 | tail -1);
       export SIM_ID=$(xcrun simctl create My-iphone11 com.apple.CoreSimulator.SimDeviceType.iPhone-11 $RUNTIME_ID);
@@ -127,10 +92,6 @@ script:
       cd ..;
       cd gdnative-sys;
       cargo dinghy --platform auto-ios-x86_64 test;
-    fi
-
-  - if [[ "$CI_STAGE_CARGO_CLIPPY" == "yes" ]]; then
-      cargo clippy --all --all-features -- -D clippy::style -D clippy::complexity -D clippy::perf -D clippy::dbg_macro -D clippy::todo -D clippy::unimplemented;
     fi
 
   - if [[ "$CI_STAGE_CARGO_TEST" == "yes" ]]; then
