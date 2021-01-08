@@ -1,9 +1,13 @@
 name: CI
 
+env:
+  RUST_BACKTRACE: 1
+  GODOT_VER=3.2
+  GODOT_REL=stable
+
 on:
   push:
     branches:
-      - master
       - staging
       - trying
 
@@ -91,6 +95,41 @@ jobs:
       - run: cargo build --release;
       # cargo build --target x86_64-pc-windows-msvc --release;
 
+  godot_test:
+    strategy:
+      matrix:
+        include:
+          - rust: stable
+            os: ubuntu-latest
+          - rust: nightly
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: KyleMayes/install-llvm-action@01144dc97b1e2693196c3056414a44f15180648b
+        with:
+          version: 10.0
+          directory: ${{ runner.temp }}/llvm
+      - run: |
+          wget "https://downloads.tuxfamily.org/godotengine/$GODOT_VER/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64.zip" -O /tmp/godot.zip
+          unzip /tmp/godot.zip -d ${{ runner.temp }}/godot_bin
+          export PATH=$PATH:$PWD/${{ runner.temp }}/godot_bin/
+          cd test;
+          cargo build;
+          mkdir ./project/lib;
+          cp ../target/debug/libgdnative_test.so ./project/lib/;
+          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
+          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
+          cargo build --features=type_tag_fallback;
+          mkdir ./project/lib;
+          cp ../target/debug/libgdnative_test.so ./project/lib/;
+          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
+          "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
+          
   # This job doesn't actually test anything, but they're used to tell bors the
   # build completed, as there is no practical way to detect when a workflow is
   # successful listening to webhooks only.
@@ -101,9 +140,11 @@ jobs:
     name: ci
     if: github.event_name == 'push' && success()
     needs:
-      - rustfmt
       # clippy
+      - rustfmt
+      - test
       - build_release
+      - godot_test
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success

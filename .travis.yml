@@ -13,24 +13,6 @@ matrix:
   fast_finish: true
 
   include:
-    - name: Godot test (stable)
-      os: linux
-      rust: stable
-      env: CI_STAGE_GODOT_TEST=yes RUST_BACKTRACE=1 GODOT_VER=3.2 GODOT_REL=stable
-      before_script:
-        - 'wget "https://downloads.tuxfamily.org/godotengine/$GODOT_VER/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64.zip" -O /tmp/godot.zip'
-        - unzip /tmp/godot.zip -d godot_bin
-        - export PATH=$PATH:$PWD/godot_bin/
-
-    - name: Godot test (nightly)
-      os: linux
-      rust: nightly
-      env: CI_STAGE_GODOT_TEST=yes RUST_BACKTRACE=1 GODOT_VER=3.2 GODOT_REL=stable
-      before_script:
-        - 'wget "https://downloads.tuxfamily.org/godotengine/$GODOT_VER/Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64.zip" -O /tmp/godot.zip'
-        - unzip /tmp/godot.zip -d godot_bin
-        - export PATH=$PATH:$PWD/godot_bin/
-
     - name: cargo test ios-simulator
       os: osx
       osx_image: xcode11.4
@@ -56,16 +38,3 @@ script:
       cargo dinghy --platform auto-ios-x86_64 test;
     fi
 
-  - if [[ "$CI_STAGE_GODOT_TEST" == "yes" ]]; then
-      cd test;
-      cargo build;
-      mkdir ./project/lib;
-      cp ../target/debug/libgdnative_test.so ./project/lib/;
-      "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
-      "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
-      cargo build --features=type_tag_fallback;
-      mkdir ./project/lib;
-      cp ../target/debug/libgdnative_test.so ./project/lib/;
-      "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" --path ./project/;
-      "Godot_v${GODOT_VER}-${GODOT_REL}_linux_headless.64" -e --path ./project/ --run-editor-tests;
-    fi
